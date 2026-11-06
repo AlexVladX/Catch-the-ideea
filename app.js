@@ -218,6 +218,7 @@ function drawSheet(){
     ${advice?`<div class="verdict"><strong>Propunerea analizei</strong><span>${esc(advice)}</span></div>`:""}
     <button class="btn bare" type="button" id="copyPrompt" style="justify-self:start">Copiază cererea pentru Claude</button>
     <div class="paste" id="pasteBox" hidden><label class="flabel" for="fPaste">Lipește aici răspunsul primit de la Claude</label><textarea id="fPaste" rows="4"></textarea><button class="btn alt" type="button" id="applyPaste">Aplică analiza</button></div>
+    <div class="field"><label for="fApproach">Cum aș putea aborda ideea</label><textarea id="fApproach" data-f="approach" rows="3" placeholder="Apasă Analizează cu AI sau scrie propriile idei">${esc(draft.approach)}</textarea></div>
     <div class="group" id="scoreBox">${scoresHtml()}</div><div id="verdict">${verdictHtml()}</div></div>
   <div class="group"><h2>Decizie</h2><div class="stages" role="group" aria-label="Decizie">${Object.keys(STAGES).map(k=>`<button type="button" data-stage="${k}" aria-pressed="${draft.stage===k}">${k==="nou"?"Încă nedecis":k==="renuntat"?"Renunț":STAGES[k].label}<small>${STAGES[k].hint}</small></button>`).join("")}</div></div>
   <div id="stageBox">${stageFields()}</div>
@@ -274,6 +275,7 @@ Analizează ideea de mai jos și răspunde doar cu JSON valid, în română, cu 
 scores (obiect cu potential, viteza, cost, timp, durabil, fiecare număr întreg 1-5; 5 înseamnă mereu favorabil: potențial mare, bani repede, cost mic, timp puțin, are sens pe termen lung),
 stage ("acum", "explorez", "parcare" sau "renuntat"),
 reason (maximum două fraze, onest, cu principalul risc),
+approach (2-3 rânduri cu idei concrete despre cum ar putea fi abordată ideea: unghi, primii clienți, ce să evite),
 nextStep (o acțiune concretă de maximum 2 ore),
 dueDate (AAAA-LL-ZZ),
 test (rezultat măsurabil de validare),
@@ -287,6 +289,7 @@ function applyAnalysis(r){
   if(r&&r.scores)CRIT.forEach(c=>{if(ok(r.scores[c[0]]))draft.scores[c[0]]=r.scores[c[0]]});
   if(STAGES[r.stage]&&r.stage!=="nou")draft.stage=r.stage;
   ["nextStep","dueDate","test","decisionDate","stopRule","reviewDate"].forEach(k=>{if(typeof r[k]==="string"&&r[k]&&!draft[k])draft[k]=r[k]});
+  if(typeof r.approach==="string"&&r.approach.trim())draft.approach=r.approach.trim();
   advice=typeof r.reason==="string"?r.reason:"";
   drawSheet();toast("Verifică propunerea, apoi apasă Salvează.");
 }
