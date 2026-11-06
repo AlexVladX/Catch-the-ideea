@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Atelier de idei</title>
+<meta name="description" content="Prinde ideile pe loc și transformă-le în pași cu termene.">
+<meta name="theme-color" content="#0B5C6B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<section class="auth" id="auth" hidden>
+  <h1>Atelier de idei</h1>
+  <p>Prinde ideile pe loc și transformă-le în pași cu termene.</p>
+  <form id="authForm" class="group">
+    <div class="field"><label for="authEmail">Email</label><input type="email" id="authEmail" autocomplete="email" required></div>
+    <div class="field" id="passField"><label for="authPass">Parolă</label><input type="password" id="authPass" autocomplete="current-password" minlength="8"></div>
+    <button class="btn" id="authSubmit" type="submit">Intră în cont</button>
+    <p class="hint" id="authMsg" role="status"></p>
+  </form>
+  <div class="quick"><button type="button" id="authMode">Nu am cont</button><button type="button" id="authForgot">Am uitat parola</button></div>
+</section>
+
+<main class="wrap" id="app" hidden>
+  <header class="top">
+    <div><h1>Atelier de idei</h1><p id="today"></p></div>
+    <div class="countdown" id="countdown"></div>
+  </header>
+  <div class="banner" id="status" hidden></div>
+
+  <section id="view-azi" style="display:grid;gap:22px">
+    <form class="capture" id="captureForm">
+      <label for="captureText">Ce idee ți-a venit?</label>
+      <textarea id="captureText" rows="3" placeholder="Scrie sau dictează cu microfonul tastaturii. Prima linie devine titlul."></textarea>
+      <div class="capture-row"><span class="hint">Analizezi mai târziu.</span><button class="btn" id="captureBtn" type="submit">Salvează ideea</button></div>
+    </form>
+    <div id="attention"></div>
+    <div id="todo"></div>
+  </section>
+
+  <section id="view-idei" hidden style="display:grid;gap:14px">
+    <div class="pipeline" id="pipeline"></div>
+    <div class="chips" id="chips" role="group" aria-label="Filtrează ideile"></div>
+    <div id="ideaWarn"></div>
+    <div id="ideaList"></div>
+  </section>
+
+  <section id="view-revizuire" hidden style="display:grid;gap:14px">
+    <div class="section"><h2>Revizuirea de 15 minute</h2>
+      <p class="hint" id="reviewLast" style="margin:0"></p></div>
+    <ul class="list" id="reviewList"></ul>
+    <button class="btn" id="reviewDone" type="button">Am terminat revizuirea</button>
+    <div class="group"><h2>Setări</h2>
+      <div class="field"><label for="targetDate">Termenul meu principal</label><input type="date" id="targetDate"><span class="hint">Opțional. Apare ca numărătoare inversă sus.</span></div>
+      <div class="quick"><button type="button" id="exportBtn">Exportă ideile</button><button type="button" id="importBtn">Importă idei</button><button type="button" id="logoutBtn">Ieși din cont</button></div>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <p class="hint" id="accountLine" style="margin:0"></p>
+    </div>
+  </section>
+</main>
+
+<nav id="nav" aria-label="Secțiuni" hidden><div>
+  <button type="button" data-view="azi" aria-current="page">Azi<span id="navBadge"></span></button>
+  <button type="button" data-view="idei">Idei</button>
+  <button type="button" data-view="revizuire">Revizuire</button>
+</div></nav>
+
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-label="Fișa ideii"></div>
+<div class="sheet-bar" id="sheetBar" hidden><div>
+  <button class="btn alt" id="sheetClose" type="button">Închide</button>
+  <button class="btn" id="sheetSave" type="button">Salvează</button>
+</div></div>
+<div class="toast" id="toast" hidden role="status"></div>
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
