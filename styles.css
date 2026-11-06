@@ -110,3 +110,4 @@ input[type=email],input[type=password]{width:100%;min-width:0;background:var(--s
 .auth{max-width:420px;margin:0 auto;padding-block:48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px}
 .auth p{margin:0}
 .paste{display:grid;gap:8px}
+.two-stack{display:grid;gap:12px}
