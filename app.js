@@ -1,19 +1,19 @@
 (function(){
 "use strict";
 const STAGES={
-  nou:{label:"Noi",hint:"Încă neanalizată"},
-  acum:{label:"Acum",hint:"Lucrez la ea, maximum 2"},
-  explorez:{label:"Explorez",hint:"Pași mici, orizont lung"},
-  parcare:{label:"Parcare",hint:"O recitesc la o dată"},
-  realizat:{label:"Realizate",hint:"Am pus-o în practică"},
-  renuntat:{label:"Renunțate",hint:"Nu o mai urmăresc"}
+  nou:{label:"Noi",one:"Încă nedecis",state:"Nedecisă",hint:"Încă neanalizată"},
+  acum:{label:"Lucrez acum",one:"Lucrez acum",state:"Lucrez acum la ea",hint:"Maximum 2 idei deodată"},
+  explorez:{label:"Testez",one:"Testez",state:"O testez",hint:"Lucruri mici, fără grabă"},
+  parcare:{label:"Mai târziu",one:"Mai târziu",state:"Pentru mai târziu",hint:"O recitesc la o dată"},
+  realizat:{label:"Realizate",one:"Am realizat-o",state:"Realizată",hint:"Am pus-o în practică"},
+  renuntat:{label:"Renunțate",one:"Renunț",state:"Renunțată",hint:"Nu o mai urmăresc"}
 };
 const CRIT=[
-  ["potential","Potențial de câștig","1 mic · 5 mare"],
-  ["viteza","Primii bani","1 târziu · 5 repede"],
-  ["cost","Cost de pornire","1 mare · 5 mic"],
-  ["timp","Timp cerut","1 mult · 5 puțin"],
-  ["durabil","Are sens pe termen lung","1 deloc · 5 sigur"]
+  ["potential","Potențial de câștig",["Foarte mic","Mic","Mediu","Mare","Foarte mare"]],
+  ["viteza","Primii bani vin",["Foarte târziu","Târziu","Mediu","Repede","Foarte repede"]],
+  ["cost","Cost de pornire",["Foarte mare","Mare","Mediu","Mic","Foarte mic"]],
+  ["timp","Timp cerut",["Foarte mult","Mult","Mediu","Puțin","Foarte puțin"]],
+  ["durabil","Are sens pe termen lung",["Deloc","Puțin","Posibil","Probabil","Sigur"]]
 ];
 const DRAFT_KEY="atelier-draft", MAX_ACUM=2, REVIEW_DAYS=7, CFG=window.ATELIER_CONFIG||{};
 let sb=null, user=null, ideas=[], meta={}, loaded=false, view="azi", filter="acum";
@@ -53,7 +53,7 @@ function attentionItems(){
   const t=today(), out=[];
   ideas.forEach(i=>{
     if(i.stage==="nou"&&diff(t,(i.createdAt||t).slice(0,10))>=3)out.push({i,msg:"Așteaptă analiza"});
-    if((i.stage==="acum"||i.stage==="explorez")&&!i.nextStep)out.push({i,msg:"Nu are următorul pas"});
+    if((i.stage==="acum"||i.stage==="explorez")&&!i.nextStep)out.push({i,msg:"Alege ce faci mai departe"});
     if((i.stage==="acum"||i.stage==="explorez")&&i.decisionDate&&i.decisionDate<=t)out.push({i,msg:"A venit data deciziei"});
     if(i.stage==="parcare"&&i.reviewDate&&i.reviewDate<=t)out.push({i,msg:"E timpul să o recitești"});
   });
@@ -85,9 +85,9 @@ function renderAzi(){
   const att=attentionItems();
   $("attention").innerHTML=att.length?`<div class="section"><div class="section-head"><h2>Cere o decizie</h2><span class="count">${att.length}</span></div><ul class="list">${att.map(x=>ideaRow(x.i,{msg:x.msg})).join("")}</ul></div>`:"";
   const s=steps();
-  let html=`<div class="section"><div class="section-head"><h2>Următorii pași</h2><span class="count">${s.length}</span></div>`;
+  let html=`<div class="section"><div class="section-head"><h2>De făcut</h2><span class="count">${s.length}</span></div>`;
   if(s.length)html+=`<ul class="list">${s.map(i=>ideaRow(i,{step:true})).join("")}</ul>`;
-  else html+=`<p class="empty" style="margin:0">${loaded?"Aici apar pașii cu termen. Adaugă o idee, analizeaz-o și alege „Acum” sau „Explorez”.":"Se încarcă ideile tale…"}</p>`;
+  else html+=`<p class="empty" style="margin:0">${loaded?"Aici apare ce ai de făcut, cu termene. Adaugă o idee, analizeaz-o și alege „Lucrez acum” sau „Testez”.":"Se încarcă ideile tale…"}</p>`;
   $("todo").innerHTML=html+"</div>";
 }
 function renderIdei(){
@@ -97,7 +97,7 @@ function renderIdei(){
   $("pipeline").innerHTML=[["Prind",n("nou")],["Analizez",ideas.filter(i=>advise(i.scores)&&i.stage!=="renuntat"&&i.stage!=="realizat").length],["Decid",active+n("parcare")],["Acționez",withStep]]
     .map(p=>`<div><b>${p[1]}</b>${p[0]}</div>`).join("");
   $("chips").innerHTML=Object.keys(STAGES).map(k=>`<button class="chip" type="button" data-filter="${k}" aria-pressed="${filter===k}">${STAGES[k].label} ${n(k)}</button>`).join("");
-  $("ideaWarn").innerHTML=(filter==="acum"&&n("acum")>MAX_ACUM)?`<p class="warn" style="margin:0">Ai ${n("acum")} idei la „Acum”. Lasă cel mult ${MAX_ACUM}, ca fiecare să primească timp real.</p>`:"";
+  $("ideaWarn").innerHTML=(filter==="acum"&&n("acum")>MAX_ACUM)?`<p class="warn" style="margin:0">Ai ${n("acum")} idei la „Lucrez acum”. Lasă cel mult ${MAX_ACUM}, ca fiecare să primească timp real.</p>`:"";
   const rows=ideas.filter(i=>i.stage===filter).sort((a,b)=>(advise(b.scores)?.total||0)-(advise(a.scores)?.total||0));
   $("ideaList").innerHTML=rows.length?`<ul class="list">${rows.map(i=>ideaRow(i)).join("")}</ul>`:`<p class="empty" style="margin:0">${loaded?"Nicio idee aici.":"Se încarcă ideile tale…"}</p>`;
 }
@@ -107,7 +107,7 @@ function renderRevizuire(){
   const nostep=ideas.filter(i=>(i.stage==="acum"||i.stage==="explorez")&&!i.nextStep).length;
   const dec=ideas.filter(i=>(i.stage==="acum"||i.stage==="explorez")&&i.decisionDate&&i.decisionDate<=addDays(t,7)).length;
   const park=n("parcare").filter(i=>i.reviewDate&&i.reviewDate<=addDays(t,7)).length;
-  const items=[[n("nou").length,"Analizează ideile noi","Dă note și alege unde merge fiecare."],[late,"Rezolvă pașii întârziați","Fă-i, mută termenul sau schimbă pasul."],[nostep,"Pune un pas fiecărei idei active","O idee fără pas nu avansează."],[dec,"Ia deciziile din următoarele 7 zile","Continui, schimbi direcția sau te oprești."],[park,"Recitește ideile din parcare","Le activezi sau le muți data."],[needsReview().length,"Revizuiește ideile active","Deschide fiecare idee din lista de mai jos și apasă „Am revizuit ideea”."]];
+  const items=[[n("nou").length,"Analizează ideile noi","Dă note și alege unde merge fiecare."],[late,"Rezolvă ce a întârziat","Fă lucrul, mută termenul sau alege altceva."],[nostep,"Alege ce faci mai departe la ideile active","O idee fără nimic de făcut nu avansează."],[dec,"Ia deciziile din următoarele 7 zile","Continui, schimbi direcția sau te oprești."],[park,"Recitește ideile puse pentru mai târziu","Le activezi sau le muți data."],[needsReview().length,"Revizuiește ideile active","Deschide fiecare idee din lista de mai jos și apasă „Am revizuit ideea”."]];
   $("reviewList").innerHTML=items.map(x=>`<li><div class="check"><b class="${x[0]?"":"zero"}">${x[0]}</b><span>${x[1]}<small>${x[2]}</small></span></div></li>`).join("");
   let box=$("reviewIdeas");
   if(!box){box=document.createElement("div");box.id="reviewIdeas";box.className="section";$("reviewList").after(box)}
@@ -128,7 +128,7 @@ function show(v){
   window.scrollTo(0,0);
 }
 let toastT;
-function toast(m){const t=$("toast");t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},3200)}
+function toast(m,undo){const t=$("toast");t.textContent=m;if(undo){const b=document.createElement("button");b.type="button";b.textContent="Anulează";b.onclick=()=>{t.hidden=true;undo()};t.appendChild(b)}t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},undo?7000:3200)}
 
 /* Date: Supabase, cu copie locală și coadă pentru ideile noi */
 const K=n=>"atelier-"+n+"-"+(user?user.id:"anon");
@@ -140,23 +140,28 @@ function failMsg(){return navigator.onLine===false?"Nu ai internet. Încearcă d
 const check=r=>{if(r&&r.error)throw r.error;return r};
 async function putIdea(id,data){check(await withTimeout(sb.from("ideas").upsert({user_id:user.id,id,data,updated_at:new Date().toISOString()},{onConflict:"user_id,id"})))}
 function setLocal(id,data){const i=ideas.findIndex(x=>x.id===id),row=Object.assign({id},data);if(i<0)ideas.push(row);else ideas[i]=row;lsSet(K("cache"),ideas);render()}
-async function flushOutbox(){
-  if(!user)return;
-  const box=lsGet(K("outbox"),[]);
-  for(const it of box){
-    try{await putIdea(it.id,it.data);const rest=lsGet(K("outbox"),[]).filter(x=>x.id!==it.id);lsSet(K("outbox"),rest)}catch(_){return false}
+let boxMem=null,boxFor="";
+function getBox(){const k=K("outbox");if(boxFor!==k){boxFor=k;boxMem=lsGet(k,[])}return boxMem}
+function setBox(v){boxFor=K("outbox");boxMem=v;lsSet(boxFor,v)}
+function queue(id,data){setBox(getBox().filter(x=>x.id!==id).concat([{id,data,t:Date.now()+Math.random()}]))}
+async function doFlush(){
+  if(!user)return false;
+  for(const it of getBox().slice()){
+    try{await putIdea(it.id,it.data);setBox(getBox().filter(x=>!(x.id===it.id&&x.t===it.t)))}catch(_){return false}
   }
   return true;
 }
+let flushChain=Promise.resolve();
+function flushOutbox(){const p=flushChain.then(doFlush,doFlush);flushChain=p.catch(()=>{});return p}
+const mergeBox=()=>getBox().forEach(b=>{const k=ideas.findIndex(i=>i.id===b.id),row=Object.assign({id:b.id},b.data);if(k<0)ideas.push(row);else ideas[k]=row});
 let refreshing=false;
 async function refresh(){
   if(!user||refreshing)return; refreshing=true;
   try{
     await flushOutbox();
     const r=check(await withTimeout(sb.from("ideas").select("id,data")));
-    const box=lsGet(K("outbox"),[]);
     ideas=r.data.map(x=>Object.assign({id:x.id},x.data));
-    box.forEach(b=>{if(!ideas.some(i=>i.id===b.id))ideas.push(Object.assign({id:b.id},b.data))});
+    mergeBox();
     lsSet(K("cache"),ideas);
     const s=check(await withTimeout(sb.from("user_settings").select("last_review,target_date").maybeSingle()));
     meta=s.data?{lastReview:s.data.last_review||"",targetDate:s.data.target_date||""}:{};
@@ -179,7 +184,7 @@ $("captureForm").addEventListener("submit",async e=>{
   if(!text){el.focus();return}
   const lines=text.split("\n"), title=lines[0].slice(0,90), note=(lines[0].length>90?lines[0].slice(90)+"\n":"")+lines.slice(1).join("\n");
   const id=newId(), data={title,note:note.trim(),stage:"nou",scores:{},nextStep:"",dueDate:"",test:"",decisionDate:"",stopRule:"",reviewDate:"",log:[],createdAt:new Date().toISOString()};
-  lsSet(K("outbox"),lsGet(K("outbox"),[]).concat([{id,data}]));
+  queue(id,data);
   setLocal(id,data);
   el.value="";try{localStorage.removeItem(DRAFT_KEY)}catch(_){}
   const ok=await flushOutbox();
@@ -187,76 +192,126 @@ $("captureForm").addEventListener("submit",async e=>{
 });
 
 /* Fișa ideii */
+let openSec={}, saveT=null, dirty=false, sheetStage="";
 function openSheet(id,focusStep){
   const i=ideas.find(x=>x.id===id); if(!i)return;
-  draft=JSON.parse(JSON.stringify(i)); draft.scores=draft.scores||{}; draftId=id; advice="";
-  drawSheet();
+  draft=JSON.parse(JSON.stringify(i)); draft.scores=draft.scores||{}; draftId=id; advice=""; dirty=false; sheetStage=draft.stage;
+  const isNew=draft.stage==="nou";
+  openSec={note:isNew,analiza:isNew,plan:!isNew||!!focusStep,istoric:false};
+  drawSheet();setSaveState("Modificările se salvează singure");
   $("sheet").hidden=false;$("sheetBar").hidden=false;$("sheet").scrollTop=0;document.body.style.overflow="hidden";
   if(focusStep){const f=$("fStep");if(f){f.scrollIntoView({block:"center"});f.focus()}}
 }
-function closeSheet(){draft=null;draftId=null;$("sheet").hidden=true;$("sheetBar").hidden=true;document.body.style.overflow=""}
+function closeSheet(skip){
+  if(draft&&!skip){
+    if(dirty&&!draft.title.trim())toast("Ideea nu are titlu, așa că ultimele modificări nu s-au salvat.");
+    else if(dirty)saveDraft();
+    if(draft.stage!==sheetStage){filter=draft.stage;renderIdei()}
+  }
+  clearTimeout(saveT);saveT=null;dirty=false;
+  draft=null;draftId=null;$("sheet").hidden=true;$("sheetBar").hidden=true;document.body.style.overflow="";
+}
+function setSaveState(t){const s=$("saveState");if(s)s.textContent=t}
+function touch(now){
+  dirty=true;clearTimeout(saveT);
+  if(now)saveDraft();else{setSaveState("Se salvează…");saveT=setTimeout(saveDraft,800)}
+}
+async function saveDraft(){
+  clearTimeout(saveT);saveT=null;
+  if(!draft)return;
+  if(!draft.title.trim()){setSaveState("Scrie un titlu ca să pot salva");return}
+  dirty=false;
+  const {id,...data}=JSON.parse(JSON.stringify(draft)), forId=draftId;
+  queue(forId,data);setLocal(forId,data);setSaveState("Se salvează…");
+  const ok=await flushOutbox();
+  if(draftId===forId&&!dirty)setSaveState(ok?"Salvat":"Salvat pe dispozitiv. Trimit când revii online.");
+}
+function heads(){
+  const a=advise(draft.scores), s=draft.stage, note=(draft.note||"").trim().replace(/\s+/g," ");
+  return {
+    note:note?(note.length>34?note.slice(0,34)+"…":note):"Fără note",
+    analiza:a?"Scor "+a.total+" din 25":"Neanalizată",
+    plan:STAGES[s].state,
+    istoric:draft.lastReviewed?"Revizuită pe "+nice(draft.lastReviewed):"Nerevizuită încă"
+  };
+}
+function summaryHtml(){
+  const s=draft.stage, d=dueLabel(draft.dueDate), a=advise(draft.scores);
+  let rows=`<strong>${esc(STAGES[s].state)}${s==="realizat"&&draft.doneDate?" pe "+esc(nice(draft.doneDate)):""}</strong>`;
+  if(s==="acum"||s==="explorez")rows+=draft.nextStep?`<span>De făcut: ${esc(draft.nextStep)} <span class="pill ${d.c}">${esc(d.t)}</span></span>`:`<span>Alege ce faci mai departe, la „Decizie și plan”.</span>`;
+  else if(s==="parcare")rows+=`<span>${draft.reviewDate?"O recitesc pe "+esc(nice(draft.reviewDate)):"Alege o dată la care o recitești."}</span>`;
+  else if(s==="nou")rows+=`<span>Analizeaz-o, apoi alege ce faci cu ea.</span>`;
+  if(a)rows+=`<span>Scor ${a.total} din 25</span>`;
+  return rows;
+}
+function updSummary(){
+  const b=$("sumBox");if(b)b.innerHTML=summaryHtml();
+  const h=heads();
+  document.querySelectorAll("#sheet details[data-sec]").forEach(el=>{const sm=el.querySelector("summary small");if(sm)sm.textContent=h[el.dataset.sec]||""});
+}
 function verdictHtml(){
   const a=advise(draft.scores);
-  if(!a)return `<div class="verdict"><span>Dă toate cele 5 note ca să primești o recomandare.</span></div>`;
-  return `<div class="verdict"><strong>${a.total}/25: recomand ${esc(STAGES[a.stage].label)}</strong><span>${esc(a.why)}</span></div>`;
+  if(!a)return `<div class="verdict"><span>Alege câte o variantă la toate cele 5 criterii ca să primești o recomandare.</span></div>`;
+  return `<div class="verdict"><strong>Scor ${a.total} din 25 · Recomandare: ${esc(STAGES[a.stage].one)}</strong><span>${esc(a.why)}</span></div>`;
 }
 function scoresHtml(){
-  return CRIT.map(c=>`<div class="score"><div class="score-top"><span>${c[1]}</span><span>${c[2]}</span></div><div class="seg" role="group" aria-label="${c[1]}">${[1,2,3,4,5].map(n=>`<button type="button" data-crit="${c[0]}" data-val="${n}" aria-pressed="${draft.scores[c[0]]===n}">${n}</button>`).join("")}</div></div>`).join("");
+  return CRIT.map(c=>`<div class="score"><div class="score-top"><span>${c[1]}</span></div><div class="seg" role="group" aria-label="${c[1]}">${c[2].map((w,n)=>`<button type="button" data-crit="${c[0]}" data-val="${n+1}" aria-pressed="${draft.scores[c[0]]===n+1}">${w}</button>`).join("")}</div></div>`).join("");
 }
 function stageFields(){
   const s=draft.stage;
   if(s==="acum"||s==="explorez"){
     const t=today();
-    return `<div class="group"><h2>Plan de acțiune</h2>
-    <div class="field"><label for="fStep">Următorul pas</label><input type="text" id="fStep" data-f="nextStep" value="${esc(draft.nextStep)}" placeholder="O acțiune clară, de maximum 2 ore"></div>
-    <div class="field"><label for="fDue">Termen</label><input type="date" id="fDue" data-f="dueDate" value="${esc(draft.dueDate)}">
+    return `<div class="group">
+    <div class="field"><label for="fStep">Ce fac mai departe</label><input type="text" id="fStep" data-f="nextStep" value="${esc(draft.nextStep)}" placeholder="Un lucru clar, de maximum 2 ore"></div>
+    <div class="field"><label for="fDue">Până când</label><input type="date" id="fDue" data-f="dueDate" value="${esc(draft.dueDate)}">
     <div class="quick"><button type="button" data-due="${addDays(t,1)}">Mâine</button><button type="button" data-due="${addDays(t,3)}">În 3 zile</button><button type="button" data-due="${addDays(t,7)}">Într-o săptămână</button></div></div>
-    <div class="field"><label for="fTest">Testul de validare</label><input type="text" id="fTest" data-f="test" value="${esc(draft.test)}" placeholder="Ce rezultat îmi arată că merită?"></div>
-    <div class="field"><label for="fDec">Data deciziei</label><input type="date" id="fDec" data-f="decisionDate" value="${esc(draft.decisionDate)}"></div>
+    <div class="field"><label for="fTest">Cum îmi dau seama că merită</label><input type="text" id="fTest" data-f="test" value="${esc(draft.test)}" placeholder="Un rezultat pe care îl pot număra"></div>
+    <div class="field"><label for="fDec">Data la care decid dacă merg mai departe</label><input type="date" id="fDec" data-f="decisionDate" value="${esc(draft.decisionDate)}"></div>
     <div class="field"><label for="fStop">Mă opresc dacă</label><input type="text" id="fStop" data-f="stopRule" value="${esc(draft.stopRule)}" placeholder="Condiția clară de oprire"></div></div>`;
   }
-  if(s==="parcare")return `<div class="group"><h2>Parcare</h2><div class="field"><label for="fRev">Recitesc ideea pe</label><input type="date" id="fRev" data-f="reviewDate" value="${esc(draft.reviewDate)}"></div></div>`;
+  if(s==="parcare")return `<div class="field"><label for="fRev">Recitesc ideea pe</label><input type="date" id="fRev" data-f="reviewDate" value="${esc(draft.reviewDate)}"></div>`;
   return "";
 }
 function drawSheet(){
-  const logs=(draft.log||[]).slice().reverse();
+  const logs=(draft.log||[]).slice().reverse(), h=heads();
+  const sec=(k,title,body)=>`<details class="sec" data-sec="${k}"${openSec[k]?" open":""}><summary><span>${title}</span><small>${esc(h[k])}</small></summary><div class="group">${body}</div></details>`;
   $("sheet").innerHTML=`<div class="sheet-in">
   <div class="field"><label for="fTitle">Ideea</label><input class="title-input" type="text" id="fTitle" data-f="title" value="${esc(draft.title)}"></div>
-  ${draft.stage==="realizat"?`<div class="verdict"><strong>Idee realizată${draft.doneDate?" pe "+esc(nice(draft.doneDate)):""}</strong><span>O găsești la filtrul Realizate.</span></div>`:""}
-  <div class="field"><label for="fNote">Note</label><textarea id="fNote" data-f="note" rows="6" placeholder="Pentru cine e, ce problemă rezolvă, cu cine o faci">${esc(draft.note)}</textarea></div>
-  <div class="group"><div class="section-head"><h2>Analiză</h2><button class="btn alt" type="button" id="askAi">Analizează cu AI</button></div>
+  <div class="verdict" id="sumBox">${summaryHtml()}</div>
+  ${sec("note","Note",`<div class="field"><label for="fNote">Pentru cine e, ce problemă rezolvă, cu cine o faci</label><textarea id="fNote" data-f="note" rows="5">${esc(draft.note)}</textarea></div>`)}
+  ${sec("analiza","Analiză",`<button class="btn alt" type="button" id="askAi" style="justify-self:start">Analizează cu AI</button>
     ${advice?`<div class="verdict"><strong>Propunerea analizei</strong><span>${esc(advice)}</span></div>`:""}
-    <button class="btn bare" type="button" id="copyPrompt" style="justify-self:start">Copiază cererea pentru Claude</button>
-    <div class="paste" id="pasteBox" hidden><label class="flabel" for="fPaste">Lipește aici răspunsul primit de la Claude</label><textarea id="fPaste" rows="4"></textarea><button class="btn alt" type="button" id="applyPaste">Aplică analiza</button></div>
-    <div class="two-stack"><div class="field"><label for="fCost">Cheltuieli lunare estimate</label><textarea id="fCost" data-f="costRange" rows="2" placeholder="Interval în lei">${esc(draft.costRange)}</textarea></div><div class="field"><label for="fRevenue">Venituri lunare estimate</label><textarea id="fRevenue" data-f="revenueRange" rows="2" placeholder="Interval în lei">${esc(draft.revenueRange)}</textarea></div></div>
+    <div class="field"><label for="fCost">Cheltuieli lunare estimate</label><textarea id="fCost" data-f="costRange" rows="2" placeholder="Interval în lei">${esc(draft.costRange)}</textarea></div>
+    <div class="field"><label for="fRevenue">Venituri lunare estimate</label><textarea id="fRevenue" data-f="revenueRange" rows="2" placeholder="Interval în lei">${esc(draft.revenueRange)}</textarea></div>
     <div class="field"><label for="fApproach">Cum aș putea aborda ideea</label><textarea id="fApproach" data-f="approach" rows="3" placeholder="Apasă Analizează cu AI sau scrie propriile idei">${esc(draft.approach)}</textarea></div>
-    <div class="group" id="scoreBox">${scoresHtml()}</div><div id="verdict">${verdictHtml()}</div></div>
-  <div class="group"><h2>Decizie</h2><div class="stages" role="group" aria-label="Decizie">${Object.keys(STAGES).map(k=>`<button type="button" data-stage="${k}" aria-pressed="${draft.stage===k}">${k==="nou"?"Încă nedecis":k==="renuntat"?"Renunț":k==="realizat"?"Am realizat-o":STAGES[k].label}<small>${STAGES[k].hint}</small></button>`).join("")}</div></div>
-  <div id="stageBox">${stageFields()}</div>
-  ${logs.length?`<div class="group"><h2>Pași făcuți</h2><ol class="history">${logs.map(l=>`<li>${esc(l.text)} (${esc(nice(l.date))})</li>`).join("")}</ol></div>`:""}
-  <div class="group"><h2>Revizuire</h2><p class="hint" style="margin:0">${draft.lastReviewed?"Ultima revizuire: "+esc(nice(draft.lastReviewed)):"Ideea nu a fost revizuită încă."}</p><button class="btn alt" type="button" id="markReviewed" style="justify-self:start">Am revizuit ideea</button></div>
-  <div id="delBox"><button class="btn danger" type="button" id="delAsk">Șterge ideea</button></div>
+    <p class="hint" style="margin:0">Variantele din dreapta sunt cele mai favorabile.</p>
+    <div class="group" id="scoreBox">${scoresHtml()}</div><div id="verdict">${verdictHtml()}</div>
+    <button class="btn bare" type="button" id="copyPrompt" style="justify-self:start">Copiază cererea pentru Claude</button>
+    <div class="paste" id="pasteBox" hidden><label class="flabel" for="fPaste">Lipește aici răspunsul primit de la Claude</label><textarea id="fPaste" rows="4"></textarea><button class="btn alt" type="button" id="applyPaste">Aplică analiza</button></div>`)}
+  ${sec("plan","Decizie și plan",`<div class="stages" role="group" aria-label="Decizie">${Object.keys(STAGES).map(k=>`<button type="button" data-stage="${k}" aria-pressed="${draft.stage===k}">${STAGES[k].one}<small>${STAGES[k].hint}</small></button>`).join("")}</div>
+    <div id="stageBox">${stageFields()}</div>`)}
+  ${sec("istoric","Revizuire și istoric",`<p class="hint" style="margin:0">${draft.lastReviewed?"Ultima revizuire: "+esc(nice(draft.lastReviewed)):"Ideea nu a fost revizuită încă."}</p><button class="btn alt" type="button" id="markReviewed" style="justify-self:start">Am revizuit ideea</button>
+    ${logs.length?`<div class="flabel">Ce am făcut</div><ol class="history">${logs.map(l=>`<li>${esc(l.text)} (${esc(nice(l.date))})</li>`).join("")}</ol>`:""}
+    <div id="delBox"><button class="btn danger" type="button" id="delAsk">Șterge ideea</button></div>`)}
   </div>`;
 }
-$("sheet").addEventListener("input",e=>{const f=e.target.dataset.f;if(f&&draft)draft[f]=e.target.value});
+$("sheet").addEventListener("toggle",e=>{const k=e.target.dataset&&e.target.dataset.sec;if(k)openSec[k]=e.target.open},true);
+$("sheet").addEventListener("input",e=>{const f=e.target.dataset.f;if(f&&draft){draft[f]=e.target.value;updSummary();touch()}});
 $("sheet").addEventListener("click",async e=>{
   const b=e.target.closest("button"); if(!b||!draft)return;
   if(b.dataset.crit){
     const k=b.dataset.crit,v=+b.dataset.val; draft.scores[k]=v;
-    $("scoreBox").innerHTML=scoresHtml();$("verdict").innerHTML=verdictHtml();
+    $("scoreBox").innerHTML=scoresHtml();$("verdict").innerHTML=verdictHtml();updSummary();touch(true);
   }else if(b.dataset.stage){
     draft.stage=b.dataset.stage;
     if(draft.stage==="realizat"){if(!draft.doneDate)draft.doneDate=today()}else draft.doneDate="";
     document.querySelectorAll("[data-stage]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.stage===draft.stage));
-    $("stageBox").innerHTML=stageFields();
+    $("stageBox").innerHTML=stageFields();updSummary();touch(true);
   }else if(b.dataset.due){
-    draft.dueDate=b.dataset.due;$("fDue").value=b.dataset.due;
+    draft.dueDate=b.dataset.due;$("fDue").value=b.dataset.due;updSummary();touch(true);
   }else if(b.id==="markReviewed"){
     if(!draft.title.trim()){toast("Scrie un titlu pentru idee.");return}
-    b.disabled=true;
-    const {id,...data}=Object.assign({},draft,{lastReviewed:today()});
-    try{await putIdea(draftId,data);setLocal(draftId,data);closeSheet();toast("Revizuire notată. Modificările au fost salvate.")}
-    catch(err){toast(failMsg());b.disabled=false}
+    draft.lastReviewed=today();dirty=true;closeSheet();toast("Revizuire notată.");
   }else if(b.id==="askAi"){
     if(!draft.title.trim()){toast("Scrie un titlu pentru idee.");return}
     b.disabled=true;b.textContent="Se analizează…";
@@ -266,7 +321,7 @@ $("sheet").addEventListener("click",async e=>{
       if(res.error){const e=new Error("ai");e.status=res.error.context&&res.error.context.status;throw e}
       if(draftId===sheetFor)applyAnalysis(res.data);
     }catch(err){
-      toast(err.status===429?"Ai folosit toate analizele de azi. Revino mâine.":err.status===503?"Analiza AI nu este disponibilă acum. Poți da notele singur.":"Analiza nu a mers. Încearcă din nou sau dă notele singur.");
+      toast(err.status===429?"Ai folosit toate analizele de azi. Revino mâine.":err.status===503?"Analiza AI nu este disponibilă acum. Poți alege variantele singur.":"Analiza nu a mers. Încearcă din nou sau alege variantele singur.");
       const x=$("askAi");if(x){x.disabled=false;x.textContent="Analizează cu AI"}
     }
   }else if(b.id==="copyPrompt"){
@@ -279,13 +334,16 @@ $("sheet").addEventListener("click",async e=>{
     try{applyAnalysis(JSON.parse(raw.slice(raw.indexOf("{"),raw.lastIndexOf("}")+1)))}
     catch(_){toast("Nu am găsit analiza în text. Lipește tot răspunsul.")}
   }else if(b.id==="delAsk"){
-    $("delBox").innerHTML=`<p style="margin:0 0 8px">Ștergi definitiv ideea?</p><div class="quick"><button type="button" id="delYes">Da, șterge</button><button type="button" id="delNo">Nu</button></div>`;
+    $("delBox").innerHTML=`<p style="margin:0 0 8px">Ștergi ideea?</p><div class="quick"><button type="button" id="delYes">Da, șterge</button><button type="button" id="delNo">Nu</button></div>`;
   }else if(b.id==="delNo"){
     $("delBox").innerHTML=`<button class="btn danger" type="button" id="delAsk">Șterge ideea</button>`;
   }else if(b.id==="delYes"){
-    try{check(await withTimeout(sb.from("ideas").delete().eq("id",draftId)));
-      lsSet(K("outbox"),lsGet(K("outbox"),[]).filter(x=>x.id!==draftId));
-      ideas=ideas.filter(x=>x.id!==draftId);lsSet(K("cache"),ideas);render();closeSheet();toast("Idee ștearsă.")}catch(err){toast(failMsg())}
+    const id=draftId, {id:_x,...kept}=JSON.parse(JSON.stringify(ideas.find(x=>x.id===id)||draft));
+    try{await flushOutbox();check(await withTimeout(sb.from("ideas").delete().eq("id",id)));
+      setBox(getBox().filter(x=>x.id!==id));
+      ideas=ideas.filter(x=>x.id!==id);lsSet(K("cache"),ideas);render();closeSheet(true);
+      toast("Idee ștearsă.",()=>{queue(id,kept);setLocal(id,kept);flushOutbox();toast("Idee readusă.")});
+    }catch(err){toast(navigator.onLine===false?"Nu ai internet. Ștergerea merge doar online.":"Nu am putut șterge. Încearcă din nou.")}
   }
 });
 function analysisPrompt(){
@@ -306,24 +364,24 @@ reviewDate (AAAA-LL-ZZ, doar pentru parcare).
 Ideea: ${JSON.stringify({titlu:draft.title,note:draft.note})}`;
 }
 function applyAnalysis(r){
+  const before=JSON.stringify(draft), forId=draftId;
   const ok=n=>Number.isInteger(n)&&n>=1&&n<=5;
   if(r&&r.scores)CRIT.forEach(c=>{if(ok(r.scores[c[0]]))draft.scores[c[0]]=r.scores[c[0]]});
-  if(STAGES[r.stage]&&r.stage!=="nou")draft.stage=r.stage;
+  if(STAGES[r.stage]&&r.stage!=="nou"&&r.stage!=="realizat"){draft.stage=r.stage;draft.doneDate=""}
   ["nextStep","dueDate","test","decisionDate","stopRule","reviewDate"].forEach(k=>{if(typeof r[k]==="string"&&r[k]&&!draft[k])draft[k]=r[k]});
   ["approach","costRange","revenueRange"].forEach(k=>{if(typeof r[k]==="string"&&r[k].trim())draft[k]=r[k].trim()});
   advice=typeof r.reason==="string"?r.reason:"";
-  drawSheet();toast("Verifică propunerea, apoi apasă Salvează.");
+  openSec.analiza=true;openSec.plan=true;
+  drawSheet();touch(true);
+  toast("Analiză aplicată.",()=>{if(draftId!==forId)return;draft=JSON.parse(before);advice="";drawSheet();touch(true)});
 }
-$("sheetClose").addEventListener("click",closeSheet);
-$("sheetSave").addEventListener("click",async()=>{
-  if(!draft)return;
-  if(!draft.title.trim()){toast("Scrie un titlu pentru idee.");return}
-  const {id,...data}=draft; const b=$("sheetSave");b.disabled=true;
-  try{await putIdea(draftId,data);
-    filter=data.stage;setLocal(draftId,data);closeSheet();toast("Salvat.");
-  }catch(err){toast(failMsg())}
-  b.disabled=false;
-});
+(function(){
+  const save=$("sheetSave"), close=$("sheetClose");
+  close.hidden=true;save.textContent="Gata";
+  const st=document.createElement("span");st.id="saveState";st.className="save-state";st.setAttribute("role","status");
+  save.parentNode.insertBefore(st,save);
+  save.addEventListener("click",()=>closeSheet());
+})();
 
 /* Clicuri în liste și navigare */
 $("app").addEventListener("click",async e=>{
@@ -332,10 +390,10 @@ $("app").addEventListener("click",async e=>{
   else if(b.dataset.filter){filter=b.dataset.filter;renderIdei()}
   else if(b.dataset.done){
     const i=ideas.find(x=>x.id===b.dataset.done); if(!i)return;
-    const log=(i.log||[]).concat([{text:i.nextStep,date:today()}]);
-    const {id,...rest}=i, data=Object.assign({},rest,{log,nextStep:"",dueDate:""});
-    try{await putIdea(id,data);setLocal(id,data);openSheet(id,true);toast("Bifat. Care e următorul pas?");
-    }catch(err){toast(failMsg())}
+    const {id,...prev}=JSON.parse(JSON.stringify(i));
+    const data=Object.assign({},prev,{log:(prev.log||[]).concat([{text:prev.nextStep,date:today()}]),nextStep:"",dueDate:""});
+    queue(id,data);setLocal(id,data);flushOutbox();openSheet(id,true);
+    toast("Bifat. Ce faci mai departe?",()=>{if(draftId===id)closeSheet(true);queue(id,prev);setLocal(id,prev);flushOutbox()});
   }
 });
 $("nav").addEventListener("click",e=>{const b=e.target.closest("button");if(b)show(b.dataset.view)});
@@ -413,7 +471,7 @@ function enter(u){
   user=u;$("auth").hidden=true;$("app").hidden=false;$("nav").hidden=false;
   $("accountLine").textContent="Cont: "+(u.email||"");
   ideas=lsGet(K("cache"),[]);meta=lsGet(K("meta"),{});
-  lsGet(K("outbox"),[]).forEach(b=>{if(!ideas.some(i=>i.id===b.id))ideas.push(Object.assign({id:b.id},b.data))});
+  mergeBox();
   drawTarget();render();refresh();
 }
 
