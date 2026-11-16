@@ -5,6 +5,7 @@ const STAGES={
   acum:{label:"Acum",hint:"Lucrez la ea, maximum 2"},
   explorez:{label:"Explorez",hint:"Pași mici, orizont lung"},
   parcare:{label:"Parcare",hint:"O recitesc la o dată"},
+  realizat:{label:"Realizate",hint:"Am pus-o în practică"},
   renuntat:{label:"Renunțate",hint:"Nu o mai urmăresc"}
 };
 const CRIT=[
@@ -14,7 +15,7 @@ const CRIT=[
   ["timp","Timp cerut","1 mult · 5 puțin"],
   ["durabil","Are sens pe termen lung","1 deloc · 5 sigur"]
 ];
-const DRAFT_KEY="atelier-draft", MAX_ACUM=2, CFG=window.ATELIER_CONFIG||{};
+const DRAFT_KEY="atelier-draft", MAX_ACUM=2, REVIEW_DAYS=7, CFG=window.ATELIER_CONFIG||{};
 let sb=null, user=null, ideas=[], meta={}, loaded=false, view="azi", filter="acum";
 let draft=null, draftId=null, advice="";
 const $=id=>document.getElementById(id);
@@ -58,6 +59,7 @@ function attentionItems(){
   });
   return out;
 }
+const needsReview=()=>ideas.filter(i=>(i.stage==="acum"||i.stage==="explorez")&&(!i.lastReviewed||diff(today(),i.lastReviewed)>=REVIEW_DAYS)).sort((a,b)=>(a.lastReviewed||"").localeCompare(b.lastReviewed||""));
 const steps=()=>ideas.filter(i=>i.nextStep&&(i.stage==="acum"||i.stage==="explorez")).sort((a,b)=>(a.dueDate||"9999").localeCompare(b.dueDate||"9999"));
 
 /* Randare */
@@ -70,7 +72,9 @@ function ideaRow(i,opts){
     return `<li><div class="row"><button class="tick" type="button" data-done="${esc(i.id)}" aria-label="Bifează: ${esc(i.nextStep)}"><span></span></button>
     <button class="open" type="button" data-open="${esc(i.id)}"><strong>${esc(i.nextStep)}</strong><span class="meta">${m}</span></button></div></li>`;
   }
-  if(opts.msg)m=`<span class="pill today">${esc(opts.msg)}</span>`;
+  if(opts.review)m=`<span>${i.lastReviewed?"Revizuită pe "+esc(nice(i.lastReviewed)):"Nerevizuită încă"}</span>`;
+  else if(opts.msg)m=`<span class="pill today">${esc(opts.msg)}</span>`;
+  else if(i.stage==="realizat")m=`<span>${i.doneDate?"Realizată pe "+esc(nice(i.doneDate)):"Realizată"}</span>`;
   else if(i.stage==="parcare"&&i.reviewDate)m=`<span>Recitesc pe ${esc(nice(i.reviewDate))}</span>`;
   else if(i.nextStep)m=`<span class="pill ${d.c}">${esc(d.t)}</span><span>${esc(i.nextStep)}</span>`;
   else if(i.stage==="nou")m=`<span>Adăugată pe ${esc(nice((i.createdAt||today()).slice(0,10)))}</span>`;
@@ -90,7 +94,7 @@ function renderIdei(){
   const n=k=>ideas.filter(i=>i.stage===k).length;
   const active=n("acum")+n("explorez");
   const withStep=steps().length;
-  $("pipeline").innerHTML=[["Prind",n("nou")],["Analizez",ideas.filter(i=>advise(i.scores)&&i.stage!=="renuntat").length],["Decid",active+n("parcare")],["Acționez",withStep]]
+  $("pipeline").innerHTML=[["Prind",n("nou")],["Analizez",ideas.filter(i=>advise(i.scores)&&i.stage!=="renuntat"&&i.stage!=="realizat").length],["Decid",active+n("parcare")],["Acționez",withStep]]
     .map(p=>`<div><b>${p[1]}</b>${p[0]}</div>`).join("");
   $("chips").innerHTML=Object.keys(STAGES).map(k=>`<button class="chip" type="button" data-filter="${k}" aria-pressed="${filter===k}">${STAGES[k].label} ${n(k)}</button>`).join("");
   $("ideaWarn").innerHTML=(filter==="acum"&&n("acum")>MAX_ACUM)?`<p class="warn" style="margin:0">Ai ${n("acum")} idei la „Acum”. Lasă cel mult ${MAX_ACUM}, ca fiecare să primească timp real.</p>`:"";
@@ -103,8 +107,13 @@ function renderRevizuire(){
   const nostep=ideas.filter(i=>(i.stage==="acum"||i.stage==="explorez")&&!i.nextStep).length;
   const dec=ideas.filter(i=>(i.stage==="acum"||i.stage==="explorez")&&i.decisionDate&&i.decisionDate<=addDays(t,7)).length;
   const park=n("parcare").filter(i=>i.reviewDate&&i.reviewDate<=addDays(t,7)).length;
-  const items=[[n("nou").length,"Analizează ideile noi","Dă note și alege unde merge fiecare."],[late,"Rezolvă pașii întârziați","Fă-i, mută termenul sau schimbă pasul."],[nostep,"Pune un pas fiecărei idei active","O idee fără pas nu avansează."],[dec,"Ia deciziile din următoarele 7 zile","Continui, schimbi direcția sau te oprești."],[park,"Recitește ideile din parcare","Le activezi sau le muți data."]];
+  const items=[[n("nou").length,"Analizează ideile noi","Dă note și alege unde merge fiecare."],[late,"Rezolvă pașii întârziați","Fă-i, mută termenul sau schimbă pasul."],[nostep,"Pune un pas fiecărei idei active","O idee fără pas nu avansează."],[dec,"Ia deciziile din următoarele 7 zile","Continui, schimbi direcția sau te oprești."],[park,"Recitește ideile din parcare","Le activezi sau le muți data."],[needsReview().length,"Revizuiește ideile active","Deschide fiecare idee din lista de mai jos și apasă „Am revizuit ideea”."]];
   $("reviewList").innerHTML=items.map(x=>`<li><div class="check"><b class="${x[0]?"":"zero"}">${x[0]}</b><span>${x[1]}<small>${x[2]}</small></span></div></li>`).join("");
+  let box=$("reviewIdeas");
+  if(!box){box=document.createElement("div");box.id="reviewIdeas";box.className="section";$("reviewList").after(box)}
+  const rv=needsReview();
+  box.hidden=!rv.length;
+  box.innerHTML=rv.length?`<div class="section-head"><h2>Idei de revizuit</h2><span class="count">${rv.length}</span></div><ul class="list">${rv.map(i=>ideaRow(i,{review:true})).join("")}</ul>`:"";
   $("reviewLast").textContent=meta.lastReview?("Ultima revizuire: "+nice(meta.lastReview)+" · Următoarea: "+nice(addDays(meta.lastReview,7))):"Fă-o o dată pe săptămână, la aceeași oră.";
 }
 function render(){
@@ -213,6 +222,7 @@ function drawSheet(){
   const logs=(draft.log||[]).slice().reverse();
   $("sheet").innerHTML=`<div class="sheet-in">
   <div class="field"><label for="fTitle">Ideea</label><input class="title-input" type="text" id="fTitle" data-f="title" value="${esc(draft.title)}"></div>
+  ${draft.stage==="realizat"?`<div class="verdict"><strong>Idee realizată${draft.doneDate?" pe "+esc(nice(draft.doneDate)):""}</strong><span>O găsești la filtrul Realizate.</span></div>`:""}
   <div class="field"><label for="fNote">Note</label><textarea id="fNote" data-f="note" rows="6" placeholder="Pentru cine e, ce problemă rezolvă, cu cine o faci">${esc(draft.note)}</textarea></div>
   <div class="group"><div class="section-head"><h2>Analiză</h2><button class="btn alt" type="button" id="askAi">Analizează cu AI</button></div>
     ${advice?`<div class="verdict"><strong>Propunerea analizei</strong><span>${esc(advice)}</span></div>`:""}
@@ -221,9 +231,10 @@ function drawSheet(){
     <div class="two-stack"><div class="field"><label for="fCost">Cheltuieli lunare estimate</label><textarea id="fCost" data-f="costRange" rows="2" placeholder="Interval în lei">${esc(draft.costRange)}</textarea></div><div class="field"><label for="fRevenue">Venituri lunare estimate</label><textarea id="fRevenue" data-f="revenueRange" rows="2" placeholder="Interval în lei">${esc(draft.revenueRange)}</textarea></div></div>
     <div class="field"><label for="fApproach">Cum aș putea aborda ideea</label><textarea id="fApproach" data-f="approach" rows="3" placeholder="Apasă Analizează cu AI sau scrie propriile idei">${esc(draft.approach)}</textarea></div>
     <div class="group" id="scoreBox">${scoresHtml()}</div><div id="verdict">${verdictHtml()}</div></div>
-  <div class="group"><h2>Decizie</h2><div class="stages" role="group" aria-label="Decizie">${Object.keys(STAGES).map(k=>`<button type="button" data-stage="${k}" aria-pressed="${draft.stage===k}">${k==="nou"?"Încă nedecis":k==="renuntat"?"Renunț":STAGES[k].label}<small>${STAGES[k].hint}</small></button>`).join("")}</div></div>
+  <div class="group"><h2>Decizie</h2><div class="stages" role="group" aria-label="Decizie">${Object.keys(STAGES).map(k=>`<button type="button" data-stage="${k}" aria-pressed="${draft.stage===k}">${k==="nou"?"Încă nedecis":k==="renuntat"?"Renunț":k==="realizat"?"Am realizat-o":STAGES[k].label}<small>${STAGES[k].hint}</small></button>`).join("")}</div></div>
   <div id="stageBox">${stageFields()}</div>
   ${logs.length?`<div class="group"><h2>Pași făcuți</h2><ol class="history">${logs.map(l=>`<li>${esc(l.text)} (${esc(nice(l.date))})</li>`).join("")}</ol></div>`:""}
+  <div class="group"><h2>Revizuire</h2><p class="hint" style="margin:0">${draft.lastReviewed?"Ultima revizuire: "+esc(nice(draft.lastReviewed)):"Ideea nu a fost revizuită încă."}</p><button class="btn alt" type="button" id="markReviewed" style="justify-self:start">Am revizuit ideea</button></div>
   <div id="delBox"><button class="btn danger" type="button" id="delAsk">Șterge ideea</button></div>
   </div>`;
 }
@@ -235,10 +246,17 @@ $("sheet").addEventListener("click",async e=>{
     $("scoreBox").innerHTML=scoresHtml();$("verdict").innerHTML=verdictHtml();
   }else if(b.dataset.stage){
     draft.stage=b.dataset.stage;
+    if(draft.stage==="realizat"){if(!draft.doneDate)draft.doneDate=today()}else draft.doneDate="";
     document.querySelectorAll("[data-stage]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.stage===draft.stage));
     $("stageBox").innerHTML=stageFields();
   }else if(b.dataset.due){
     draft.dueDate=b.dataset.due;$("fDue").value=b.dataset.due;
+  }else if(b.id==="markReviewed"){
+    if(!draft.title.trim()){toast("Scrie un titlu pentru idee.");return}
+    b.disabled=true;
+    const {id,...data}=Object.assign({},draft,{lastReviewed:today()});
+    try{await putIdea(draftId,data);setLocal(draftId,data);closeSheet();toast("Revizuire notată. Modificările au fost salvate.")}
+    catch(err){toast(failMsg());b.disabled=false}
   }else if(b.id==="askAi"){
     if(!draft.title.trim()){toast("Scrie un titlu pentru idee.");return}
     b.disabled=true;b.textContent="Se analizează…";
