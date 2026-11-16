@@ -111,3 +111,17 @@ input[type=email],input[type=password]{width:100%;min-width:0;background:var(--s
 .auth p{margin:0}
 .paste{display:grid;gap:8px}
 .two-stack{display:grid;gap:12px}
+.sheet-in{gap:12px}
+.sec{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0}
+.sec>summary{list-style:none;cursor:pointer;padding:13px 14px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;min-height:48px}
+.sec>summary::-webkit-details-marker{display:none}
+.sec>summary span{flex:none;font-family:var(--display);font-weight:800;font-size:1.05rem}
+.sec>summary span::before{content:"+";display:inline-block;width:1.1em;color:var(--accent)}
+.sec[open]>summary span::before{content:"–"}
+.sec>summary small{color:var(--muted);font-size:.84rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sec>.group{padding:2px 14px 14px}
+.sec textarea,.sec input[type=text],.sec input[type=date],.sec .seg button,.sec .stages button{background:var(--bg)}
+.sec .seg button[aria-pressed=true]{background:var(--accent)}
+.seg button{height:auto;min-height:46px;padding:3px 2px;font-size:.76rem;line-height:1.15}
+.save-state{flex:1;align-self:center;min-width:0;color:var(--muted);font-size:.86rem}
+.toast button{margin-left:12px;padding:4px 2px;border:0;background:none;color:inherit;font:inherit;font-weight:700;text-decoration:underline}
